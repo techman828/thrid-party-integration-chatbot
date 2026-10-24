@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #ffffff;
+  --panel: #f6f6f7;
+  --hover: #ececef;
+  --border: #e2e2e6;
+  --fg: #18181b;
+  --muted: #71717a;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --danger: #dc2626;
+
+  /* Template tokens (src/lib/templates.ts). These defaults are the Classic template. */
+  --canvas: var(--bg);
+  --accent-bg: var(--accent);
+  --user-bg: var(--panel);
+  --user-fg: var(--fg);
+  --bot-bg: transparent;
+  --bot-fg: var(--fg);
+  --bot-border: transparent;
+  --sb-bg: var(--bg);
+  --sb-panel: var(--panel);
+  --sb-hover: var(--hover);
+  --sb-border: var(--border);
+  --sb-fg: var(--fg);
+  --sb-muted: var(--muted);
+  --tpl-radius: 16px;
+  --font-app: var(--font-geist-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f11;
+    --panel: #17171a;
+    --hover: #232327;
+    --border: #2a2a2f;
+    --fg: #ececee;
+    --muted: #9b9ba3;
+    --accent: #818cf8;
+    --accent-fg: #0f0f11;
+    --danger: #f87171;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-hover: var(--hover);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-user: var(--user-bg);
+  --color-user-fg: var(--user-fg);
+  --color-bot: var(--bot-bg);
+  --color-bot-fg: var(--bot-fg);
+  --color-bot-border: var(--bot-border);
+  --radius-tpl: var(--tpl-radius);
+  --font-sans: var(--font-app);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Template helpers */
+@utility btn-primary {
+  background: var(--accent-bg);
+  color: var(--accent-fg);
+}
+@utility tpl-canvas {
+  background: var(--canvas);
+}
+/* Points the shared tokens at the sidebar's palette, so a template can pair a dark sidebar with a light chat. */
+@utility tpl-sidebar {
+  --bg: var(--sb-bg);
+  --panel: var(--sb-panel);
+  --hover: var(--sb-hover);
+  --border: var(--sb-border);
+  --fg: var(--sb-fg);
+  --muted: var(--sb-muted);
+  color: var(--fg);
+}
+@utility pattern-dots {
+  background-image: radial-gradient(color-mix(in srgb, var(--fg) 16%, transparent) 1px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+@utility pattern-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--fg) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--fg) 6%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+@utility pattern-glow {
+  background-image:
+    radial-gradient(38% 34% at 72% 78%, color-mix(in srgb, var(--accent) 22%, transparent), transparent),
+    radial-gradient(34% 30% at 40% 92%, color-mix(in srgb, #f472b6 22%, transparent), transparent);
+}
+
+/* Rendered assistant markdown */
+.markdown {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.markdown > * + * {
+  margin-top: 0.75em;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.2em;
+}
+.markdown h1 { font-size: 1.4em; }
+.markdown h2 { font-size: 1.2em; }
+.markdown h3 { font-size: 1.05em; }
+.markdown ul { list-style: disc; padding-left: 1.4em; }
+.markdown ol { list-style: decimal; padding-left: 1.4em; }
+.markdown li + li { margin-top: 0.25em; }
+.markdown a { color: var(--accent); text-decoration: underline; }
+.markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.9em;
+  color: var(--muted);
+}
+.markdown code {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+  /* Tinted from the text color so code stays readable inside any template's bubbles. */
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.markdown pre {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 8px;
+  padding: 0.85em 1em;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+}
+.markdown table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 0.35em 0.7em;
+  text-align: left;
+}
+.markdown hr { border-color: var(--border); }
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.cursor::after {
+  content: "▍";
+  margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+  color: var(--muted);
+}
