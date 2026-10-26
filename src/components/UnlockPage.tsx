@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Logo } from "./Logo";
 
 const INPUT =
-  "w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent";
+  "w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm outline-none placeholder:text-subtle focus:border-subtle";
 
 export default function UnlockPage({
   mode,
@@ -48,11 +48,11 @@ export default function UnlockPage({
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 text-fg">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-panel p-6 shadow-sm">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border border-border bg-panel p-6 shadow-2xl">
         <div className="flex flex-col items-center gap-3 text-center">
           <Logo className="h-12 w-12" />
           <div>
-            <h1 className="text-lg font-semibold">{creating ? "Set a password" : "Enter password"}</h1>
+            <h1 className="font-serif text-2xl font-light tracking-tight">{creating ? "Set a password" : "Enter password"}</h1>
             <p className="mt-1 text-sm text-muted">
               {creating
                 ? "Choose the password everyone will need to open this app. You can change it later in Settings."
@@ -92,7 +92,7 @@ export default function UnlockPage({
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
+              className="w-full rounded-lg bg-fg px-3 py-2 text-sm font-medium text-bg hover:bg-white disabled:opacity-50"
             >
               {busy ? "Checking…" : creating ? "Set password and continue" : "Unlock"}
             </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { modelRef, parseModelRef, type ModelInfo } from "@/lib/types";
+import { CheckIcon, SearchIcon } from "./icons";
 
 interface Props {
   models: ModelInfo[];
@@ -15,6 +16,7 @@ interface Props {
 }
 
 const MAX_RESULTS = 200;
+const MENU_WIDTH = 416;
 
 const refOf = (m: ModelInfo) => modelRef(m.provider_id, m.id);
 
@@ -34,6 +36,8 @@ export default function ModelPicker({ models, loading, error, value, recent, onC
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  /** Opens upwards when the picker sits low on the screen (the composer at the bottom of a chat). */
+  const [placement, setPlacement] = useState({ up: false, listHeight: 320, shift: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -77,6 +81,19 @@ export default function ModelPicker({ models, loading, error, value, recent, onC
   }, [highlight]);
 
   function openPicker() {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (rect) {
+      const below = window.innerHeight - rect.bottom;
+      const up = below < 240 && rect.top > below;
+      // The menu is right-aligned with the button; on narrow screens, slide it right to keep a 16px margin.
+      const width = Math.min(MENU_WIDTH, window.innerWidth - 32);
+      setPlacement({
+        up,
+        // The list scrolls within the room left after the search box and margins.
+        listHeight: Math.max(160, Math.min(320, (up ? rect.top : below) - 72)),
+        shift: Math.max(0, 16 - (rect.right - width)),
+      });
+    }
     setQuery("");
     setHighlight(0);
     setOpen(true);
@@ -104,23 +121,30 @@ export default function ModelPicker({ models, loading, error, value, recent, onC
   }
 
   let index = -1;
+  const current = value ? models.find((m) => refOf(m) === value) : undefined;
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative flex min-w-0">
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openPicker())}
-        className="flex max-w-[16rem] items-center gap-2 rounded-lg border border-border bg-panel px-3 py-1.5 text-sm hover:bg-hover"
+        className={`flex h-8 max-w-[18rem] min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm hover:bg-raised ${open ? "bg-raised" : ""}`}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="truncate">{value ? parseModelRef(value).modelId : loading ? "Loading models…" : "Select a model"}</span>
-        <span className="text-muted">▾</span>
+        {current && <span className="hidden shrink-0 text-muted sm:inline">{current.provider_name}</span>}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-border bg-bg shadow-xl">
-          <div className="border-b border-border p-2">
+        <div
+          style={{ width: MENU_WIDTH, right: -placement.shift }}
+          className={`absolute z-30 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-raised bg-panel shadow-2xl ${
+            placement.up ? "bottom-full mb-2" : "top-full mt-2"
+          }`}
+        >
+          <div className="flex items-center gap-2 border-b border-raised px-3.5">
+            <SearchIcon className="shrink-0 text-muted" />
             <input
               ref={inputRef}
               value={query}
@@ -130,31 +154,37 @@ export default function ModelPicker({ models, loading, error, value, recent, onC
               }}
               onKeyDown={onKeyDown}
               placeholder="Search models… (e.g. claude sonnet, gpt 4o)"
-              className="w-full rounded-md bg-panel px-3 py-2 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent"
+              className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-subtle"
               role="combobox"
               aria-controls="model-listbox"
               aria-expanded
             />
           </div>
 
-          <ul id="model-listbox" ref={listRef} role="listbox" className="max-h-80 overflow-y-auto py-1">
+          <ul
+            id="model-listbox"
+            ref={listRef}
+            role="listbox"
+            style={{ maxHeight: placement.listHeight }}
+            className="overflow-y-auto p-1.5"
+          >
             {error && (
-              <li className="whitespace-pre-line px-3 py-3 text-sm text-danger">
+              <li className="whitespace-pre-line px-2.5 py-2 text-sm text-danger">
                 {error}{" "}
                 <button className="underline" onClick={onRetry}>
                   Retry
                 </button>
               </li>
             )}
-            {!error && loading && <li className="px-3 py-3 text-sm text-muted">Loading models…</li>}
+            {!error && loading && <li className="px-2.5 py-2 text-sm text-muted">Loading models…</li>}
             {!error && !loading && flat.length === 0 && (
-              <li className="px-3 py-3 text-sm text-muted">No models match “{query}”.</li>
+              <li className="px-2.5 py-2 text-sm text-muted">No models match “{query}”.</li>
             )}
             {sections.map(
               (section) =>
                 section.items.length > 0 && (
                   <li key={section.label}>
-                    <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    <div className="px-2.5 pb-1 pt-2 text-xs text-muted">
                       {section.label}
                     </div>
                     <ul>
@@ -170,15 +200,15 @@ export default function ModelPicker({ models, loading, error, value, recent, onC
                             aria-selected={ref === value}
                             onMouseEnter={() => setHighlight(i)}
                             onClick={() => choose(ref)}
-                            className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-sm ${
-                              i === highlight ? "bg-hover" : ""
+                            className={`flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-1.5 ${
+                              i === highlight ? "bg-active" : ""
                             }`}
                           >
-                            <span className="truncate font-mono text-[13px]">{m.id}</span>
-                            <span className="flex shrink-0 items-center gap-2 text-xs text-muted">
-                              {m.provider_name}
-                              {ref === value && <span className="text-accent">✓</span>}
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm">{m.id}</span>
+                              <span className="block truncate text-xs text-muted">{m.provider_name}</span>
                             </span>
+                            {ref === value && <CheckIcon width={18} height={18} className="shrink-0 text-link" />}
                           </li>
                         );
                       })}

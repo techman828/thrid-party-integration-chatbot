@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import Sidebar from "./Sidebar";
 import ModelPicker from "./ModelPicker";
 import ModeToggle from "./ModeToggle";
 import MessageList, { type PendingReply } from "./MessageList";
-import Composer from "./Composer";
+import Composer, { type ComposerHandle } from "./Composer";
+import { Greeting, Suggestions } from "./Welcome";
+import { PanelLeftIcon } from "./icons";
 import * as db from "@/lib/db";
 import { sendChat } from "@/lib/api";
 import { mimeTypeFor, unsupportedAttachments, unsupportedMessage } from "@/lib/attachments";
@@ -21,7 +22,6 @@ import {
   type ResponseMode,
 } from "@/lib/types";
 import { useProviders } from "@/lib/useProviders";
-import { useTemplate } from "@/lib/useTemplate";
 
 const LS_MODEL = "chat.model";
 const LS_MODE = "chat.mode";
@@ -67,15 +67,18 @@ export default function ChatApp() {
   const [loadingMessages, setLoadingMessages] = useState(false);
 
   const { models, modelsLoading, modelsError, error: providersError, reloadModels } = useProviders();
-  const { layout } = useTemplate();
   /** Selected model ref ("<providerId>::<modelId>"). */
   const [model, setModel] = useState<string | null>(null);
   const [recentModels, setRecentModels] = useState<string[]>([]);
   const [mode, setMode] = useState<ResponseMode>("stream");
 
   const [pending, setPending] = useState<PendingReply | null>(null);
+  /** The drawer on small screens. */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  /** Collapsed on wide screens. */
+  const [sidebarHidden, setSidebarHidden] = useState(false);
 
+  const composerRef = useRef<ComposerHandle>(null);
   const abortRef = useRef<AbortController | null>(null);
   const activeChatRef = useRef<string | null>(null);
   activeChatRef.current = activeChatId;
@@ -83,6 +86,8 @@ export default function ChatApp() {
 
   const sending = pending !== null;
   const activeChat = chats.find((c) => c.id === activeChatId) ?? null;
+  /** Nothing to show yet: the greeting, composer and suggestions sit together in the middle. */
+  const landing = !loadingMessages && messages.length === 0 && !pending;
 
   // Restore preferences (older versions stored bare OneProvider model ids).
   useEffect(() => {
@@ -265,6 +270,18 @@ export default function ChatApp() {
     abortRef.current?.abort();
   }
 
+  const isWide = () => window.matchMedia("(min-width: 768px)").matches;
+
+  function showSidebar() {
+    if (isWide()) setSidebarHidden(false);
+    else setSidebarOpen(true);
+  }
+
+  function hideSidebar() {
+    if (isWide()) setSidebarHidden(true);
+    else setSidebarOpen(false);
+  }
+
   async function renameChat(id: string, title: string) {
     setChats((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)));
     try {
@@ -336,49 +353,79 @@ export default function ChatApp() {
   }
 
   return (
-    <div className={`h-dvh ${layout.frame ? "tpl-canvas md:p-6" : ""}`}>
+    <div className="flex h-dvh overflow-hidden bg-bg">
+      {/* Mobile backdrop */}
+      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} />}
       <div
-        className={`flex h-full overflow-hidden bg-bg ${
-          layout.frame ? "md:rounded-[28px] md:border md:border-border md:shadow-2xl" : ""
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } ${sidebarHidden ? "md:hidden" : ""}`}
       >
-        {/* Mobile backdrop */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
-        <div
-          className={`fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0 ${
-            sidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } ${layout.sidebar === "floating" ? "md:py-3 md:pl-3" : ""}`}
-        >
-          <Sidebar
-            collections={collections}
-            chats={chats}
-            activeChatId={activeChatId}
-            busy={sending}
-            onOpenChat={openChat}
-            onNewChat={newChat}
-            onRenameChat={renameChat}
-            onDeleteChats={deleteChats}
-            onMoveChats={moveChats}
-            onCreateCollection={createCollection}
-            onRenameCollection={renameCollection}
-            onDeleteCollection={deleteCollection}
-          />
-        </div>
+        <Sidebar
+          collections={collections}
+          chats={chats}
+          activeChatId={activeChatId}
+          busy={sending}
+          onOpenChat={openChat}
+          onNewChat={newChat}
+          onRenameChat={renameChat}
+          onDeleteChats={deleteChats}
+          onMoveChats={moveChats}
+          onCreateCollection={createCollection}
+          onRenameCollection={renameCollection}
+          onDeleteCollection={deleteCollection}
+          onHide={hideSidebar}
+        />
+      </div>
 
-        <main className={`flex min-w-0 flex-1 flex-col ${layout.mainPattern === "none" ? "" : `pattern-${layout.mainPattern}`}`}>
-          <header className="flex items-center gap-3 border-b border-border px-4 py-2.5">
-            <button
-              type="button"
-              className="rounded-md px-2 py-1 text-lg hover:bg-hover md:hidden"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open history"
+      {/* The composer keeps its place among main's children, so it stays mounted (and focused) when the first message is sent. */}
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-12 shrink-0 items-center gap-2 px-3">
+          <button
+            type="button"
+            onClick={showSidebar}
+            aria-label="Open sidebar"
+            title="Open sidebar"
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-hover hover:text-fg ${
+              sidebarHidden ? "" : "md:hidden"
+            }`}
+          >
+            <PanelLeftIcon />
+          </button>
+          {activeChat && <h2 className="min-w-0 truncate px-1 text-sm">{activeChat.title}</h2>}
+        </header>
+
+        {landing ? (
+          <Greeting className="mt-auto" />
+        ) : (
+          <MessageList messages={messages} pending={pending} loading={loadingMessages} />
+        )}
+
+        {error && (
+          <div className="px-4">
+            <div
+              className={`mx-auto mb-2 flex w-full items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger ${
+                landing ? "max-w-2xl" : "max-w-3xl"
+              }`}
             >
-              ☰
-            </button>
-            <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{activeChat?.title ?? "New chat"}</h2>
-            <ModeToggle value={mode} onChange={chooseMode} disabled={sending} />
+              <span className="break-words">{error}</span>
+              <button type="button" onClick={() => setError(null)} aria-label="Dismiss error">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        <Composer
+          ref={composerRef}
+          landing={landing}
+          onSend={send}
+          onStop={stop}
+          sending={sending}
+          disabled={!ready || !model}
+          placeholder={!ready ? "Connecting…" : landing ? "How can I help you today?" : "Reply…"}
+          toolbarStart={<ModeToggle value={mode} onChange={chooseMode} disabled={sending} />}
+          toolbarEnd={
             <ModelPicker
               models={models}
               loading={modelsLoading}
@@ -388,50 +435,11 @@ export default function ChatApp() {
               onChange={chooseModel}
               onRetry={reloadModels}
             />
-            {sending ? (
-              // Leaving now would drop the reply that is still arriving.
-              <span
-                aria-disabled="true"
-                className="cursor-not-allowed rounded-lg border border-border bg-panel px-2.5 py-1.5 text-sm opacity-40"
-                title="Settings are available once the reply finishes"
-              >
-                ⚙
-              </span>
-            ) : (
-              <Link
-                href="/settings"
-                className="rounded-lg border border-border bg-panel px-2.5 py-1.5 text-sm hover:bg-hover"
-                aria-label="Settings"
-                title="Settings"
-              >
-                ⚙
-              </Link>
-            )}
-          </header>
+          }
+        />
 
-          {!ready ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-muted">Connecting…</div>
-          ) : (
-            <MessageList
-              messages={messages}
-              pending={pending}
-              loading={loadingMessages}
-              onSuggest={model ? (text) => void send(text) : undefined}
-            />
-          )}
-
-          {error && (
-            <div className="mx-auto mb-2 flex w-full max-w-3xl items-start justify-between gap-3 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-              <span className="break-words">{error}</span>
-              <button type="button" onClick={() => setError(null)} aria-label="Dismiss error">
-                ✕
-              </button>
-            </div>
-          )}
-
-          <Composer onSend={send} onStop={stop} sending={sending} disabled={!ready || !model} />
-        </main>
-      </div>
+        {landing && <Suggestions className="mb-auto pb-[10vh]" onPick={(prompt) => composerRef.current?.prefill(prompt)} />}
+      </main>
     </div>
   );
 }

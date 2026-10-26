@@ -1,43 +1,59 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { PendingAttachments } from "./Attachments";
+import { ArrowUpIcon, PlusIcon } from "./icons";
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, formatBytes } from "@/lib/attachments";
-import { useTemplate } from "@/lib/useTemplate";
 
-function SendIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M22 2 11 13" />
-      <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
-    </svg>
-  );
+export interface ComposerHandle {
+  /** Replaces the draft with `text` and puts the cursor at its end. */
+  prefill: (text: string) => void;
 }
 
 export default function Composer({
+  ref,
   onSend,
   onStop,
   sending,
   disabled,
   placeholder,
+  landing = false,
+  toolbarStart,
+  toolbarEnd,
 }: {
+  ref?: React.Ref<ComposerHandle>;
   onSend: (text: string, files: File[]) => void;
   onStop: () => void;
   sending: boolean;
   disabled?: boolean;
   placeholder?: string;
+  /** On the empty-chat screen: narrower, with a taller text area. */
+  landing?: boolean;
+  /** Controls after the attach button, and before the send button. */
+  toolbarStart?: React.ReactNode;
+  toolbarEnd?: React.ReactNode;
 }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const template = useTemplate();
-  const { composer, send: sendStyle } = template.layout;
+
+  useImperativeHandle(ref, () => ({
+    prefill(value) {
+      setText(value);
+      requestAnimationFrame(() => {
+        const el = textRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(value.length, value.length);
+      });
+    },
+  }), []);
 
   useEffect(() => {
-    const el = ref.current;
+    const el = textRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
@@ -67,83 +83,10 @@ export default function Composer({
     setFileError(null);
   }
 
-  const attachButton = (
-    <>
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => {
-          if (e.target.files) addFiles(e.target.files);
-          e.target.value = "";
-        }}
-      />
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={sending}
-        title="Attach documents, images, audio or video (or drop/paste them here)"
-        aria-label="Attach files"
-        className="rounded-tpl px-2.5 py-2 text-lg leading-none text-muted hover:bg-hover hover:text-fg disabled:opacity-40"
-      >
-        📎
-      </button>
-    </>
-  );
-
-  const textarea = (
-    <textarea
-      ref={ref}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-          e.preventDefault();
-          submit();
-        }
-      }}
-      onPaste={(e) => {
-        if (e.clipboardData.files.length) {
-          e.preventDefault();
-          addFiles(e.clipboardData.files);
-        }
-      }}
-      rows={composer === "card" ? 2 : 1}
-      placeholder={
-        dragOver
-          ? "Drop files to attach"
-          : (placeholder ?? template.placeholder ?? "Send a message…  (Shift+Enter for a new line)")
-      }
-      className="max-h-60 w-full flex-1 resize-none bg-transparent px-2 py-1.5 outline-none placeholder:text-muted"
-    />
-  );
-
-  const iconButton = "flex h-9 w-9 shrink-0 items-center justify-center rounded-full";
-  const sendButton = sending ? (
-    <button
-      type="button"
-      onClick={onStop}
-      aria-label="Stop generating"
-      className={sendStyle === "icon" ? `${iconButton} border border-border hover:bg-hover` : "rounded-tpl border border-border px-4 py-2 text-sm hover:bg-hover"}
-    >
-      {sendStyle === "icon" ? <span className="h-3 w-3 rounded-sm bg-fg" /> : "Stop"}
-    </button>
-  ) : (
-    <button
-      type="submit"
-      disabled={(!text.trim() && files.length === 0) || disabled}
-      aria-label="Send"
-      className={`btn-primary shadow-sm disabled:opacity-40 ${
-        sendStyle === "icon" ? iconButton : "flex items-center gap-1.5 rounded-tpl px-4 py-2 text-sm font-medium"
-      }`}
-    >
-      {sendStyle === "icon" ? <SendIcon /> : composer === "card" ? <>Send <SendIcon /></> : "Send"}
-    </button>
-  );
+  const iconButton = "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg";
 
   return (
-    <div className={composer === "docked" ? "border-t border-border bg-bg px-4 pb-4 pt-3" : "px-4 pb-5 pt-2"}>
+    <div className={`w-full px-4 ${landing ? "" : "pb-4"}`}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -163,28 +106,74 @@ export default function Composer({
           setDragOver(false);
           if (!sending) addFiles(e.dataTransfer.files);
         }}
-        className={`mx-auto max-w-3xl rounded-tpl border bg-panel focus-within:ring-2 focus-within:ring-accent ${
-          dragOver ? "border-accent ring-2 ring-accent" : "border-border"
-        } ${composer === "docked" ? "p-2" : composer === "floating" ? "p-2 shadow-lg" : "p-3 shadow-sm"}`}
+        className={`mx-auto w-full rounded-2xl border bg-panel px-3 pb-2 pt-3 shadow-[0_4px_24px_rgba(0,0,0,0.25)] transition-colors ${
+          landing ? "max-w-2xl" : "max-w-3xl"
+        } ${dragOver ? "border-link" : "border-border focus-within:border-subtle"}`}
       >
         <PendingAttachments files={files} onRemove={(i) => setFiles((prev) => prev.filter((_, j) => j !== i))} />
-        {fileError && <p className="px-2 pb-2 text-xs text-danger">{fileError}</p>}
+        {fileError && <p className="px-1 pb-2 text-xs text-danger">{fileError}</p>}
 
-        {composer === "card" ? (
-          <>
-            {textarea}
-            <div className="flex items-center justify-between gap-2 pt-1">
-              {attachButton}
-              {sendButton}
-            </div>
-          </>
-        ) : (
-          <div className="flex items-end gap-2">
-            {attachButton}
-            {textarea}
-            {sendButton}
+        <textarea
+          ref={textRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          onPaste={(e) => {
+            if (e.clipboardData.files.length) {
+              e.preventDefault();
+              addFiles(e.clipboardData.files);
+            }
+          }}
+          rows={1}
+          placeholder={dragOver ? "Drop files to attach" : (placeholder ?? "How can I help you today?")}
+          className={`max-h-60 w-full resize-none bg-transparent px-1 outline-none placeholder:text-subtle ${landing ? "min-h-12" : "min-h-7"}`}
+        />
+
+        <div className="mt-1.5 flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            title="Attach documents, images, audio or video (or drop/paste them here)"
+            aria-label="Attach files"
+            className={`${iconButton} -ml-1 text-muted hover:bg-hover hover:text-fg disabled:opacity-40`}
+          >
+            <PlusIcon width={18} height={18} />
+          </button>
+          {toolbarStart}
+          <div className="ml-auto flex min-w-0 items-center gap-1.5">
+            {toolbarEnd}
+            {sending ? (
+              <button type="button" onClick={onStop} aria-label="Stop generating" className={`${iconButton} bg-accent hover:brightness-110`}>
+                <span className="h-2.5 w-2.5 rounded-[2px] bg-accent-fg" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={(!text.trim() && files.length === 0) || disabled}
+                aria-label="Send"
+                className={`${iconButton} bg-accent text-accent-fg hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100`}
+              >
+                <ArrowUpIcon />
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </form>
     </div>
   );

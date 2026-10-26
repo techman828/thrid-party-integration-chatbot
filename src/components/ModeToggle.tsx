@@ -17,7 +17,7 @@ export default function ModeToggle({
   disabled?: boolean;
 }) {
   return (
-    <div role="radiogroup" aria-label="Response display mode" className="flex rounded-lg border border-border bg-panel p-0.5 text-sm">
+    <div role="radiogroup" aria-label="Response display mode" className="flex h-[26px] shrink-0 rounded-lg bg-raised text-sm">
       {OPTIONS.map((opt) => (
         <button
           key={opt.value}
@@ -27,8 +27,8 @@ export default function ModeToggle({
           title={opt.title}
           disabled={disabled}
           onClick={() => onChange(opt.value)}
-          className={`rounded-md px-3 py-1 transition-colors disabled:opacity-60 ${
-            value === opt.value ? "bg-accent text-accent-fg" : "text-muted hover:text-fg"
+          className={`rounded-lg px-2.5 transition-colors disabled:opacity-60 ${
+            value === opt.value ? "bg-active text-fg" : "text-fg/85 hover:text-fg"
           }`}
         >
           {opt.label}

@@ -100,3 +100,9 @@ export async function sendChat({ model, messages, mode, signal, onDelta }: SendC
   }
   return text;
 }
+
+/** Locks the app for this browser and goes back to the password screen. */
+export async function lockApp() {
+  await fetch("/api/lock", { method: "DELETE" });
+  window.location.replace("/unlock");
+}

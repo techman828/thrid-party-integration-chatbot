@@ -4,15 +4,14 @@ A chatbot UI built with Next.js (App Router) and TypeScript. It talks to models 
 
 ## Features
 
-- **Platform password.** The app is locked until someone enters the password. On first visit, `/unlock` asks you to set it (at least 8 characters). After that, everyone must enter it to reach the chat. It is asked again when the browser is reopened, and after 12 hours. Change it or lock the app under **Settings → Security**.
+- **Platform password.** The app is locked until someone enters the password. On first visit, `/unlock` asks you to set it (at least 8 characters). After that, everyone must enter it to reach the chat. It is asked again when the browser is reopened, and after 12 hours. Change it under **Settings → Security**, or lock the app from the **Settings** menu at the bottom of the sidebar.
 - Chat with any model OneProvider exposes. The model picker has search and suggestions, and lists recently used models first.
-- Add your own OpenAI-compatible providers (OpenAI, OpenRouter, Groq, Ollama, …) under **Settings (⚙, opens the `/settings` page) → API providers** with a name, base URL and API key. Their models appear in the same picker, labelled by provider. The OneProvider key and base URL can be edited there too, which overrides `.env.local`. **Reset** goes back to the server key.
-- **Templates.** Under **Settings → Appearance** you can pick one of 16 templates. Each one changes the colors, font, sidebar, message bubbles, composer and start screen. The change applies right away and is remembered in the browser.
+- Add your own OpenAI-compatible providers (OpenAI, OpenRouter, Groq, Ollama, …) under **Settings → API providers** (the **Settings** menu at the bottom of the sidebar opens the `/settings` page) with a name, base URL and API key. Their models appear in the same picker, labelled by provider. The OneProvider key and base URL can be edited there too, which overrides `.env.local`. **Reset** goes back to the server key.
 - Two response modes:
   - **Stream** shows the reply as it is generated, and you can stop it partway.
   - **Complete** shows the reply only once it has finished.
 - Chat history is saved in Supabase. You can search it and rename chats.
-- **Attachments.** Attach documents, images, audio or video with 📎, by dropping files on the message box, or by pasting. You can send up to 10 files per message, at most 25 MB each. Files are stored in a private Supabase Storage bucket, shown in the chat (images, audio and video play inline), and sent to the model along with your text.
+- **Attachments.** Attach documents, images, audio or video with the **+** button in the message box, by dropping files on the message box, or by pasting. You can send up to 10 files per message, at most 25 MB each. Files are stored in a private Supabase Storage bucket, shown in the chat (images, audio and video play inline), and sent to the model along with your text.
   - Text and code files are pasted into the message as text, so every model can read them.
   - Which other files a model can read depends on the model:
 
@@ -64,11 +63,9 @@ A chatbot UI built with Next.js (App Router) and TypeScript. It talks to models 
 | `src/lib/providers.ts` | Server-only: resolves a provider id to its base URL and key (built-in from env, others from Supabase) |
 | `src/lib/db.ts` | Supabase queries for collections, chats, messages, providers and attachment uploads |
 | `src/lib/attachments.ts` | Shared attachment rules: file kinds, size limits, and which model families can read what |
-| `src/lib/templates.ts` | The UI templates: color tokens, font and layout choices, plus the boot script that applies the saved template before first paint |
-| `src/lib/useTemplate.ts` | Client store for the active template (`useTemplate()`, `setTemplate()`), saved in localStorage |
 | `src/lib/useProviders.ts` | Hook for providers and their models, shared by the chat and the settings page |
 | `src/lib/contentParts.ts` | Server-only: downloads a message's attachments as the caller and converts them to the content parts each model family accepts |
-| `src/components/` | `ChatApp` (state), `Sidebar` (history, selection, collections, drag-and-drop), `ModelPicker`, `ModeToggle`, `MessageList`, `Composer`, `Attachments`, `SettingsPage` (the `/settings` route), `TemplatePicker` |
+| `src/components/` | `ChatApp` (state), `Sidebar` (history, selection, collections, drag-and-drop), `ModelPicker`, `ModeToggle`, `MessageList`, `Composer`, `Attachments`, `Welcome` (greeting and suggestions on the empty-chat screen), `SettingsPage` (the `/settings` route), `icons` |
 
 The OneProvider key is used only by the two small route handlers inside this Next.js app, so it is never sent to the browser. There is no separate backend.
 

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import TemplatePicker from "./TemplatePicker";
+import { ArrowLeftIcon } from "./icons";
+import { lockApp } from "@/lib/api";
 import { supabaseConfigured } from "@/lib/supabase";
 import { BUILTIN_DEFAULT_BASE_URL, BUILTIN_PROVIDER_ID, type Provider } from "@/lib/types";
 import { useProviders, type ProviderInput, type ProviderStatus } from "@/lib/useProviders";
@@ -19,7 +20,8 @@ const PRESETS: Array<{ name: string; base_url: string }> = [
 ];
 
 const INPUT =
-  "w-full rounded-md border border-border bg-bg px-2.5 py-1.5 text-sm outline-none placeholder:text-muted focus:ring-2 focus:ring-accent";
+  "w-full rounded-lg border border-border bg-bg px-2.5 py-1.5 text-sm outline-none placeholder:text-subtle focus:border-subtle";
+const PRIMARY = "rounded-lg bg-fg px-3 py-1.5 text-sm font-medium text-bg hover:bg-white disabled:opacity-50";
 
 function StatusLine({ status }: { status?: ProviderStatus }) {
   if (!status || status.loading) return <span className="text-muted">Checking…</span>;
@@ -135,13 +137,13 @@ function ProviderForm({
       </label>
       {error && <p className="text-sm text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-md px-3 py-1.5 text-sm hover:bg-hover">
+        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-1.5 text-sm hover:bg-hover">
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
+          className={PRIMARY}
         >
           {saving ? "Saving…" : initial || builtin ? "Save" : "Add provider"}
         </button>
@@ -198,7 +200,7 @@ function ProvidersSection() {
 
   return (
     <div className="space-y-3">
-      <ul className="divide-y divide-border rounded-lg border border-border bg-bg">
+      <ul className="divide-y divide-border rounded-xl border border-border bg-sidebar">
         {editing === BUILTIN_PROVIDER_ID ? (
           <li className="p-2">
             <ProviderForm
@@ -341,11 +343,6 @@ function SecuritySection() {
     }
   }
 
-  async function lock() {
-    await fetch("/api/lock", { method: "DELETE" });
-    window.location.replace("/unlock");
-  }
-
   return (
     <div className="space-y-3">
       <form onSubmit={submit} className="space-y-3 rounded-lg border border-border bg-panel p-3">
@@ -366,7 +363,7 @@ function SecuritySection() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg disabled:opacity-50"
+            className={PRIMARY}
           >
             {saving ? "Saving…" : "Change password"}
           </button>
@@ -374,7 +371,7 @@ function SecuritySection() {
       </form>
       <button
         type="button"
-        onClick={lock}
+        onClick={() => void lockApp()}
         className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted hover:bg-hover hover:text-fg"
       >
         Lock now
@@ -384,7 +381,6 @@ function SecuritySection() {
 }
 
 const SECTIONS = [
-  { id: "appearance", label: "Appearance" },
   { id: "providers", label: "API providers" },
   { id: "security", label: "Security" },
 ];
@@ -392,57 +388,50 @@ const SECTIONS = [
 export default function SettingsPage() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="rounded-md px-2 py-1 text-sm text-muted hover:bg-hover hover:text-fg">
-            ← Back to chat
+      <header className="sticky top-0 z-20 border-b border-divider bg-bg/90 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
+          <Link href="/" className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted hover:bg-hover hover:text-fg">
+            <ArrowLeftIcon width={14} height={14} />
+            Back to chat
           </Link>
-          <h1 className="text-base font-semibold">Settings</h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 md:flex md:gap-10">
-        <nav className="mb-6 flex gap-1 md:sticky md:top-20 md:mb-0 md:w-44 md:shrink-0 md:flex-col md:self-start">
-          {SECTIONS.map((s) => (
-            <a key={s.id} href={`#${s.id}`} className="rounded-md px-3 py-1.5 text-sm text-muted hover:bg-hover hover:text-fg">
-              {s.label}
-            </a>
-          ))}
-        </nav>
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <h1 className="mb-8 font-serif text-3xl font-light tracking-tight">Settings</h1>
+        <div className="md:flex md:gap-10">
+          <nav className="mb-6 flex gap-1 md:sticky md:top-20 md:mb-0 md:w-44 md:shrink-0 md:flex-col md:self-start">
+            {SECTIONS.map((s) => (
+              <a key={s.id} href={`#${s.id}`} className="rounded-lg px-3 py-1.5 text-sm text-muted hover:bg-hover hover:text-fg">
+                {s.label}
+              </a>
+            ))}
+          </nav>
 
-        <main className="min-w-0 flex-1 space-y-12">
-          <section id="appearance" className="scroll-mt-20 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Appearance</h2>
-              <p className="mt-0.5 text-sm text-muted">
-                Pick a template to restyle the whole app. The change applies right away and is remembered in this browser.
-              </p>
-            </div>
-            <TemplatePicker />
-          </section>
+          <main className="min-w-0 flex-1 space-y-12">
+            <section id="providers" className="scroll-mt-20 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">API providers</h2>
+                <p className="mt-0.5 text-sm text-muted">
+                  Models from every provider below appear in the model picker. Keys are stored in your Supabase project and are only used by
+                  this app’s server.
+                </p>
+              </div>
+              <ProvidersSection />
+            </section>
 
-          <section id="providers" className="scroll-mt-20 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">API providers</h2>
-              <p className="mt-0.5 text-sm text-muted">
-                Models from every provider below appear in the model picker. Keys are stored in your Supabase project and are only used by
-                this app’s server.
-              </p>
-            </div>
-            <ProvidersSection />
-          </section>
-
-          <section id="security" className="scroll-mt-20 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Security</h2>
-              <p className="mt-0.5 text-sm text-muted">
-                Everyone has to enter the platform password before they can open the app. It is asked again whenever the browser is
-                reopened, and after 12 hours.
-              </p>
-            </div>
-            <SecuritySection />
-          </section>
-        </main>
+            <section id="security" className="scroll-mt-20 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">Security</h2>
+                <p className="mt-0.5 text-sm text-muted">
+                  Everyone has to enter the platform password before they can open the app. It is asked again whenever the browser is
+                  reopened, and after 12 hours.
+                </p>
+              </div>
+              <SecuritySection />
+            </section>
+          </main>
+        </div>
       </div>
     </div>
   );
