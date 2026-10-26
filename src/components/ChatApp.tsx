@@ -7,7 +7,10 @@ import ModeToggle from "./ModeToggle";
 import MessageList, { type PendingReply } from "./MessageList";
 import Composer, { type ComposerHandle } from "./Composer";
 import { Greeting, Suggestions } from "./Welcome";
-import { PanelLeftIcon } from "./icons";
+import ChatMenu from "./ChatMenu";
+import ConfirmDialog, { type ConfirmRequest } from "./ConfirmDialog";
+import InlineInput from "./InlineInput";
+import { ChevronDownIcon, PanelLeftIcon } from "./icons";
 import * as db from "@/lib/db";
 import { sendChat } from "@/lib/api";
 import { mimeTypeFor, unsupportedAttachments, unsupportedMessage } from "@/lib/attachments";
@@ -77,6 +80,10 @@ export default function ChatApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   /** Collapsed on wide screens. */
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  /** The title dropdown in the header. */
+  const [titleMenu, setTitleMenu] = useState<HTMLElement | null>(null);
+  const [renamingTitle, setRenamingTitle] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   const composerRef = useRef<ComposerHandle>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -291,6 +298,16 @@ export default function ChatApp() {
     }
   }
 
+  async function togglePin(id: string, pinned: boolean) {
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, pinned } : c)));
+    try {
+      await db.updateChat(id, { pinned });
+    } catch (err) {
+      setChats((prev) => prev.map((c) => (c.id === id ? { ...c, pinned: !pinned } : c)));
+      setError((err as Error).message);
+    }
+  }
+
   async function deleteChats(ids: string[]) {
     try {
       await db.deleteChats(ids);
@@ -369,6 +386,7 @@ export default function ChatApp() {
           onOpenChat={openChat}
           onNewChat={newChat}
           onRenameChat={renameChat}
+          onTogglePin={togglePin}
           onDeleteChats={deleteChats}
           onMoveChats={moveChats}
           onCreateCollection={createCollection}
@@ -392,8 +410,57 @@ export default function ChatApp() {
           >
             <PanelLeftIcon />
           </button>
-          {activeChat && <h2 className="min-w-0 truncate px-1 text-sm">{activeChat.title}</h2>}
+          {activeChat &&
+            (renamingTitle ? (
+              <div className="w-72 max-w-full">
+                <InlineInput
+                  key={activeChat.id}
+                  initial={activeChat.title}
+                  onSubmit={(title) => {
+                    void renameChat(activeChat.id, title);
+                    setRenamingTitle(false);
+                  }}
+                  onCancel={() => setRenamingTitle(false)}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  const anchor = e.currentTarget;
+                  setTitleMenu((open) => (open ? null : anchor));
+                }}
+                aria-haspopup="menu"
+                aria-expanded={titleMenu !== null}
+                className={`flex h-8 min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm hover:bg-hover ${titleMenu ? "bg-hover" : ""}`}
+              >
+                <h2 className="min-w-0 truncate">{activeChat.title}</h2>
+                <ChevronDownIcon width={14} height={14} className="shrink-0 text-muted" />
+              </button>
+            ))}
         </header>
+
+        {activeChat && titleMenu && (
+          <ChatMenu
+            chat={activeChat}
+            collections={collections}
+            anchor={titleMenu}
+            align="start"
+            canDelete={!sending}
+            onClose={() => setTitleMenu(null)}
+            onTogglePin={() => void togglePin(activeChat.id, !activeChat.pinned)}
+            onRename={() => setRenamingTitle(true)}
+            onMove={(collectionId) => void moveChats([activeChat.id], collectionId)}
+            onDelete={() =>
+              setConfirmRequest({
+                title: "Delete chat?",
+                message: "Are you sure you want to delete this chat?",
+                onConfirm: () => deleteChats([activeChat.id]),
+              })
+            }
+          />
+        )}
+        {confirmRequest && <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />}
 
         {landing ? (
           <Greeting className="mt-auto" />

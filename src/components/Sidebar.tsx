@@ -16,9 +16,13 @@ import {
 } from "@dnd-kit/core";
 import { lockApp } from "@/lib/api";
 import type { Chat, Collection } from "@/lib/types";
+import ChatMenu from "./ChatMenu";
+import ConfirmDialog, { type ConfirmRequest } from "./ConfirmDialog";
+import InlineInput from "./InlineInput";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
+  EllipsisIcon,
   FolderIcon,
   FolderPlusIcon,
   KeyIcon,
@@ -38,7 +42,6 @@ const UNSORTED = "unsorted";
 
 const ROW = "flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-sm";
 const ICON_BUTTON = "flex h-6 w-6 items-center justify-center rounded-md text-muted hover:bg-hover hover:text-fg";
-const SECTION_TITLE = "text-[13px] font-semibold";
 
 interface Props {
   collections: Collection[];
@@ -48,6 +51,7 @@ interface Props {
   onOpenChat: (id: string) => void;
   onNewChat: () => void;
   onRenameChat: (id: string, title: string) => void;
+  onTogglePin: (id: string, pinned: boolean) => void;
   onDeleteChats: (ids: string[]) => Promise<void>;
   onMoveChats: (ids: string[], collectionId: string | null) => void;
   onCreateCollection: (name: string) => void;
@@ -57,62 +61,33 @@ interface Props {
   onHide: () => void;
 }
 
-function InlineInput({
-  initial,
-  placeholder,
-  onSubmit,
-  onCancel,
-}: {
-  initial: string;
-  placeholder?: string;
-  onSubmit: (value: string) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(initial);
-  const commit = () => {
-    const v = value.trim();
-    if (v && v !== initial) onSubmit(v);
-    else onCancel();
-  };
-  return (
-    <input
-      autoFocus
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") commit();
-        if (e.key === "Escape") onCancel();
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      className="w-full min-w-0 rounded-md bg-bg px-1.5 py-0.5 text-sm outline-none ring-1 ring-link"
-    />
-  );
-}
-
 function ChatRow({
   chat,
   active,
   selectMode,
   selected,
+  editing,
+  menuOpen,
   dragCount,
   onOpen,
   onToggle,
+  onEditingChange,
   onRename,
-  onDelete,
+  onMenu,
 }: {
   chat: Chat;
   active: boolean;
   selectMode: boolean;
   selected: boolean;
+  editing: boolean;
+  menuOpen: boolean;
   dragCount: number;
   onOpen: () => void;
   onToggle: (shift: boolean) => void;
+  onEditingChange: (editing: boolean) => void;
   onRename: (title: string) => void;
-  onDelete: () => void;
+  onMenu: (anchor: HTMLElement) => void;
 }) {
-  const [editing, setEditing] = useState(false);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `chat:${chat.id}`,
     data: { chatId: chat.id, title: chat.title, count: dragCount },
@@ -129,10 +104,10 @@ function ChatRow({
         if (selectMode || e.metaKey || e.ctrlKey) onToggle(e.shiftKey);
         else onOpen();
       }}
-      onDoubleClick={() => !selectMode && setEditing(true)}
-      className={`group ${ROW} cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-link ${
+      onDoubleClick={() => !selectMode && onEditingChange(true)}
+      className={`group ${ROW} cursor-pointer select-none pr-1 outline-none focus-visible:ring-2 focus-visible:ring-link ${
         isDragging ? "opacity-40" : ""
-      } ${selected ? "bg-link/15" : active && !selectMode ? "bg-hover" : "hover:bg-hover"}`}
+      } ${selected ? "bg-link/15" : (active || menuOpen) && !selectMode ? "bg-hover" : "hover:bg-hover"}`}
       title={chat.title}
     >
       {selectMode && (
@@ -149,43 +124,61 @@ function ChatRow({
           initial={chat.title}
           onSubmit={(v) => {
             onRename(v);
-            setEditing(false);
+            onEditingChange(false);
           }}
-          onCancel={() => setEditing(false)}
+          onCancel={() => onEditingChange(false)}
         />
       ) : (
         <span className="flex-1 truncate">{chat.title}</span>
       )}
       {!selectMode && !editing && (
-        <span className="-mr-1 hidden shrink-0 gap-0.5 group-hover:flex">
-          <button
-            type="button"
-            title="Rename"
-            aria-label="Rename"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditing(true);
-            }}
-            className={ICON_BUTTON}
-          >
-            <PencilIcon width={14} height={14} />
-          </button>
-          <button
-            type="button"
-            title="Delete"
-            aria-label="Delete"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className={`${ICON_BUTTON} hover:text-danger`}
-          >
-            <TrashIcon width={14} height={14} />
-          </button>
-        </span>
+        <button
+          type="button"
+          title="More options"
+          aria-label={`More options for ${chat.title}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMenu(e.currentTarget);
+          }}
+          className={`${ICON_BUTTON} shrink-0 focus-visible:flex ${
+            menuOpen ? "flex bg-active text-fg" : "hidden group-hover:flex hover:bg-active"
+          }`}
+        >
+          <EllipsisIcon width={14} height={14} />
+        </button>
       )}
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  /** Actions shown at the right end of the header. */
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between py-1 pl-2.5 pr-1.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex items-center gap-1 text-xs font-medium text-muted hover:text-fg"
+      >
+        {title}
+        <ChevronDownIcon width={12} height={12} className={`transition-transform ${open ? "" : "-rotate-90"}`} />
+      </button>
+      {children}
     </div>
   );
 }
@@ -211,6 +204,7 @@ export default function Sidebar(props: Props) {
     onOpenChat,
     onNewChat,
     onRenameChat,
+    onTogglePin,
     onDeleteChats,
     onMoveChats,
     onCreateCollection,
@@ -228,6 +222,9 @@ export default function Sidebar(props: Props) {
   const [filter, setFilter] = useState("");
   const [dragging, setDragging] = useState<{ title: string; count: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chatMenu, setChatMenu] = useState<{ chatId: string; anchor: HTMLElement } | null>(null);
+  const [renamingChat, setRenamingChat] = useState<string | null>(null);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const footerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -259,9 +256,13 @@ export default function Sidebar(props: Props) {
     return q ? chats.filter((c) => c.title.toLowerCase().includes(q)) : chats;
   }, [chats, filter]);
 
+  const pinned = useMemo(() => visibleChats.filter((c) => c.pinned), [visibleChats]);
+
+  /** Unpinned chats by collection id (or UNSORTED); pinned ones are only listed under Pinned. */
   const groups = useMemo(() => {
     const byCollection = new Map<string, Chat[]>();
     for (const c of visibleChats) {
+      if (c.pinned) continue;
       const key = c.collection_id ?? UNSORTED;
       if (!byCollection.has(key)) byCollection.set(key, []);
       byCollection.get(key)!.push(c);
@@ -271,9 +272,20 @@ export default function Sidebar(props: Props) {
 
   // Display order, used for shift-click range selection.
   const orderedIds = useMemo(
-    () => [...collections.map((col) => col.id), UNSORTED].flatMap((key) => (groups.get(key) ?? []).map((c) => c.id)),
-    [collections, groups],
+    () => [
+      ...pinned.map((c) => c.id),
+      ...[...collections.map((col) => col.id), UNSORTED].flatMap((key) => (groups.get(key) ?? []).map((c) => c.id)),
+    ],
+    [pinned, collections, groups],
   );
+
+  const toggleCollapsed = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   function toggle(id: string, shift: boolean) {
     if (!selectMode) setSelectMode(true);
@@ -300,12 +312,26 @@ export default function Sidebar(props: Props) {
     setLastToggled(null);
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     const ids = [...selected];
     if (ids.length === 0) return;
-    if (!confirm(`Delete ${ids.length} chat${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
-    await onDeleteChats(ids);
-    exitSelectMode();
+    const plural = ids.length === 1 ? "" : "s";
+    setConfirmRequest({
+      title: `Delete ${ids.length} chat${plural}?`,
+      message: `Are you sure you want to delete ${ids.length === 1 ? "this chat" : `these ${ids.length} chats`}? This cannot be undone.`,
+      onConfirm: async () => {
+        await onDeleteChats(ids);
+        exitSelectMode();
+      },
+    });
+  }
+
+  function deleteChat(chat: Chat) {
+    setConfirmRequest({
+      title: "Delete chat?",
+      message: "Are you sure you want to delete this chat?",
+      onConfirm: () => onDeleteChats([chat.id]),
+    });
   }
 
   /** Dragging a selected chat moves the whole selection; otherwise just that chat. */
@@ -343,18 +369,20 @@ export default function Sidebar(props: Props) {
         active={chat.id === activeChatId}
         selectMode={selectMode}
         selected={selected.has(chat.id)}
+        editing={renamingChat === chat.id}
+        menuOpen={chatMenu?.chatId === chat.id}
         dragCount={idsForDrag(chat.id).length}
         onOpen={() => onOpenChat(chat.id)}
         onToggle={(shift) => toggle(chat.id, shift)}
+        onEditingChange={(editing) => setRenamingChat(editing ? chat.id : null)}
         onRename={(title) => onRenameChat(chat.id, title)}
-        onDelete={() => {
-          if (confirm(`Delete “${chat.title}”?`)) void onDeleteChats([chat.id]);
-        }}
+        onMenu={(anchor) => setChatMenu((m) => (m?.chatId === chat.id ? null : { chatId: chat.id, anchor }))}
       />
     ));
   }
 
   const unsorted = groups.get(UNSORTED) ?? [];
+  const menuChat = chatMenu ? chats.find((c) => c.id === chatMenu.chatId) : undefined;
 
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col overflow-hidden border-r border-divider bg-sidebar">
@@ -428,7 +456,7 @@ export default function Sidebar(props: Props) {
                 className="min-w-0 flex-1 rounded-md border border-border bg-bg px-2 py-1 text-xs"
               >
                 <option value="">Move to…</option>
-                <option value={UNSORTED}>No collection</option>
+                <option value={UNSORTED}>No group</option>
                 {collections.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -449,115 +477,120 @@ export default function Sidebar(props: Props) {
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDragging(null)}>
         <nav className="mt-4 flex-1 space-y-5 overflow-y-auto px-1.5 pb-3">
+          {pinned.length > 0 && (
+            <section>
+              <SectionHeader title="Pinned" open={!collapsed.has("section:pinned")} onToggle={() => toggleCollapsed("section:pinned")} />
+              {!collapsed.has("section:pinned") && <div className="space-y-0.5">{renderChats(pinned)}</div>}
+            </section>
+          )}
+
           {/* Collections */}
           <section>
-            <div className="flex items-center justify-between py-1 pl-2.5 pr-1.5">
-              <span className={SECTION_TITLE}>Collections</span>
-              <button type="button" title="New collection" aria-label="New collection" onClick={() => setCreatingCollection(true)} className={ICON_BUTTON}>
+            <SectionHeader title="Groups" open={!collapsed.has("section:groups")} onToggle={() => toggleCollapsed("section:groups")}>
+              <button type="button" title="New group" aria-label="New group" onClick={() => setCreatingCollection(true)} className={ICON_BUTTON}>
                 <FolderPlusIcon width={14} height={14} />
               </button>
-            </div>
+            </SectionHeader>
 
-            {creatingCollection && (
-              <div className="px-2.5 py-1">
-                <InlineInput
-                  initial=""
-                  placeholder="Collection name"
-                  onSubmit={(name) => {
-                    onCreateCollection(name);
-                    setCreatingCollection(false);
-                  }}
-                  onCancel={() => setCreatingCollection(false)}
-                />
-              </div>
-            )}
+            {!collapsed.has("section:groups") && (
+              <>
+                {creatingCollection && (
+                  <div className="px-2.5 py-1">
+                    <InlineInput
+                      initial=""
+                      placeholder="Group name"
+                      onSubmit={(name) => {
+                        onCreateCollection(name);
+                        setCreatingCollection(false);
+                      }}
+                      onCancel={() => setCreatingCollection(false)}
+                    />
+                  </div>
+                )}
 
-            {collections.length === 0 && !creatingCollection && (
-              <p className="px-2.5 py-1 text-[13px] text-muted">Create a collection, then drag chats into it.</p>
-            )}
+                {collections.length === 0 && !creatingCollection && (
+                  <p className="px-2.5 py-1 text-[13px] text-muted">Create a group, then drag chats into it.</p>
+                )}
 
-            <div className="space-y-0.5">
-              {collections.map((col) => {
-                const items = groups.get(col.id) ?? [];
-                const isCollapsed = collapsed.has(col.id);
-                return (
-                  <DropZone key={col.id} id={col.id}>
-                    <div className={`group ${ROW} gap-1.5 pl-1.5 hover:bg-hover`}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCollapsed((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(col.id)) next.delete(col.id);
-                            else next.add(col.id);
-                            return next;
-                          })
-                        }
-                        className="flex h-5 w-5 shrink-0 items-center justify-center text-muted hover:text-fg"
-                        aria-label={isCollapsed ? "Expand" : "Collapse"}
-                      >
-                        {isCollapsed ? <ChevronRightIcon width={14} height={14} /> : <ChevronDownIcon width={14} height={14} />}
-                      </button>
-                      <FolderIcon className="shrink-0 text-muted" />
-                      {renamingCollection === col.id ? (
-                        <InlineInput
-                          initial={col.name}
-                          onSubmit={(name) => {
-                            onRenameCollection(col.id, name);
-                            setRenamingCollection(null);
-                          }}
-                          onCancel={() => setRenamingCollection(null)}
-                        />
-                      ) : (
-                        <span className="flex-1 truncate" onDoubleClick={() => setRenamingCollection(col.id)}>
-                          {col.name}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted group-hover:hidden">{items.length}</span>
-                      <span className="-mr-1 hidden gap-0.5 group-hover:flex">
-                        <button
-                          type="button"
-                          title="Rename collection"
-                          aria-label="Rename collection"
-                          onClick={() => setRenamingCollection(col.id)}
-                          className={ICON_BUTTON}
-                        >
-                          <PencilIcon width={14} height={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Delete collection"
-                          aria-label="Delete collection"
-                          onClick={() => {
-                            if (confirm(`Delete collection “${col.name}”? Its chats will be kept and moved out.`))
-                              onDeleteCollection(col.id);
-                          }}
-                          className={`${ICON_BUTTON} hover:text-danger`}
-                        >
-                          <TrashIcon width={14} height={14} />
-                        </button>
-                      </span>
-                    </div>
-                    {!isCollapsed && (
-                      <div className="ml-[17px] space-y-0.5 border-l border-divider pl-1.5">
-                        {items.length ? (
-                          renderChats(items)
-                        ) : (
-                          <p className="px-2.5 py-1 text-[13px] text-muted">Drop chats here</p>
+                <div className="space-y-0.5">
+                  {collections.map((col) => {
+                    const items = groups.get(col.id) ?? [];
+                    const isCollapsed = collapsed.has(col.id);
+                    return (
+                      <DropZone key={col.id} id={col.id}>
+                        <div className={`group ${ROW} gap-1.5 pl-1.5 hover:bg-hover`}>
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(col.id)}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center text-muted hover:text-fg"
+                            aria-label={isCollapsed ? "Expand" : "Collapse"}
+                          >
+                            {isCollapsed ? <ChevronRightIcon width={14} height={14} /> : <ChevronDownIcon width={14} height={14} />}
+                          </button>
+                          <FolderIcon className="shrink-0 text-muted" />
+                          {renamingCollection === col.id ? (
+                            <InlineInput
+                              initial={col.name}
+                              onSubmit={(name) => {
+                                onRenameCollection(col.id, name);
+                                setRenamingCollection(null);
+                              }}
+                              onCancel={() => setRenamingCollection(null)}
+                            />
+                          ) : (
+                            <span className="flex-1 truncate" onDoubleClick={() => setRenamingCollection(col.id)}>
+                              {col.name}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted group-hover:hidden">{items.length}</span>
+                          <span className="-mr-1 hidden gap-0.5 group-hover:flex">
+                            <button
+                              type="button"
+                              title="Rename group"
+                              aria-label="Rename group"
+                              onClick={() => setRenamingCollection(col.id)}
+                              className={ICON_BUTTON}
+                            >
+                              <PencilIcon width={14} height={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete group"
+                              aria-label="Delete group"
+                              onClick={() =>
+                                setConfirmRequest({
+                                  title: "Delete group?",
+                                  message: `“${col.name}” will be deleted. Its chats are kept and moved out of the group.`,
+                                  onConfirm: () => onDeleteCollection(col.id),
+                                })
+                              }
+                              className={`${ICON_BUTTON} hover:text-danger`}
+                            >
+                              <TrashIcon width={14} height={14} />
+                            </button>
+                          </span>
+                        </div>
+                        {!isCollapsed && (
+                          <div className="ml-[17px] space-y-0.5 border-l border-divider pl-1.5">
+                            {items.length ? (
+                              renderChats(items)
+                            ) : (
+                              <p className="px-2.5 py-1 text-[13px] text-muted">Drop chats here</p>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </DropZone>
-                );
-              })}
-            </div>
+                      </DropZone>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </section>
 
           {/* Chats without a collection */}
           <section>
             <DropZone id={UNSORTED} className="min-h-16 space-y-0.5 pb-2">
-              <div className="flex items-center justify-between py-1 pl-2.5 pr-1.5">
-                <span className={SECTION_TITLE}>Chats</span>
+              <SectionHeader title="Chats" open={!collapsed.has("section:chats")} onToggle={() => toggleCollapsed("section:chats")}>
                 {!selectMode && (
                   <button
                     type="button"
@@ -570,14 +603,15 @@ export default function Sidebar(props: Props) {
                     <ListChecksIcon width={14} height={14} />
                   </button>
                 )}
-              </div>
-              {unsorted.length ? (
-                renderChats(unsorted)
-              ) : (
-                <p className="px-2.5 py-1 text-sm text-muted">
-                  {filter ? "No matching chats." : chats.length ? "All chats are in collections." : "No chats yet."}
-                </p>
-              )}
+              </SectionHeader>
+              {!collapsed.has("section:chats") &&
+                (unsorted.length ? (
+                  renderChats(unsorted)
+                ) : (
+                  <p className="px-2.5 py-1 text-sm text-muted">
+                    {filter ? "No matching chats." : chats.length ? "All chats are pinned or in groups." : "No chats yet."}
+                  </p>
+                ))}
             </DropZone>
           </section>
         </nav>
@@ -591,6 +625,22 @@ export default function Sidebar(props: Props) {
           )}
         </DragOverlay>
       </DndContext>
+
+      {chatMenu && menuChat && (
+        <ChatMenu
+          chat={menuChat}
+          collections={collections}
+          anchor={chatMenu.anchor}
+          canDelete={!(busy && menuChat.id === activeChatId)}
+          onClose={() => setChatMenu(null)}
+          onTogglePin={() => onTogglePin(menuChat.id, !menuChat.pinned)}
+          onRename={() => setRenamingChat(menuChat.id)}
+          onMove={(collectionId) => onMoveChats([menuChat.id], collectionId)}
+          onDelete={() => deleteChat(menuChat)}
+        />
+      )}
+
+      {confirmRequest && <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />}
 
       <div ref={footerRef} className="relative border-t border-divider p-1.5">
         {menuOpen && (

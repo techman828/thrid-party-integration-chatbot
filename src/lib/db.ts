@@ -32,7 +32,7 @@ export async function deleteCollection(id: string): Promise<void> {
 
 // Chats
 
-const CHAT_COLUMNS = "id, collection_id, title, model, created_at, updated_at";
+const CHAT_COLUMNS = "id, collection_id, title, model, pinned, created_at, updated_at";
 
 export async function listChats(): Promise<Chat[]> {
   return unwrap(
@@ -51,7 +51,7 @@ export async function createChat(title: string, model: string | null): Promise<C
 
 export async function updateChat(
   id: string,
-  patch: Partial<Pick<Chat, "title" | "model" | "collection_id" | "updated_at">>,
+  patch: Partial<Pick<Chat, "title" | "model" | "collection_id" | "pinned" | "updated_at">>,
 ): Promise<void> {
   unwrap(await getSupabase().from("chats").update(patch).eq("id", id));
 }

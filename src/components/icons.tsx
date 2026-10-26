@@ -36,6 +36,22 @@ export const ArrowUpIcon = icon("ArrowUpIcon", <path d="m5 12 7-7 7 7M12 19V5" /
 export const CheckIcon = icon("CheckIcon", <path d="M20 6 9 17l-5-5" />);
 export const XIcon = icon("XIcon", <path d="M18 6 6 18M6 6l12 12" />);
 export const ListChecksIcon = icon("ListChecksIcon", <path d="m3 17 2 2 4-4M3 7l2 2 4-4M13 6h8M13 12h8M13 18h8" />);
+export const EllipsisIcon = icon(
+  "EllipsisIcon",
+  <>
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
+    <circle cx="5" cy="12" r="1" />
+  </>,
+);
+export const PinIcon = icon(
+  "PinIcon",
+  <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />,
+);
+export const PinOffIcon = icon(
+  "PinOffIcon",
+  <path d="M12 17v5M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89M2 2l20 20M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" />,
+);
 export const FolderIcon = icon(
   "FolderIcon",
   <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />,

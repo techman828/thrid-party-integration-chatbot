@@ -13,6 +13,7 @@ export interface Chat {
   collection_id: string | null;
   title: string;
   model: string | null;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
 }

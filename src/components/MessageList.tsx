@@ -33,27 +33,34 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function TypingDots({ label }: { label: string }) {
+const THINKING_WORDS = ["Cogitating", "Pondering", "Mulling it over", "Ruminating", "Deliberating", "Contemplating"];
+
+/** Shown until the first words of a reply arrive: a pulsing accent mark and a word that changes every few seconds. */
+function Thinking() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => (n + 1) % THINKING_WORDS.length), 3000);
+    return () => clearInterval(id);
+  }, []);
   return (
-    <div className="flex items-center gap-2 text-sm opacity-70">
-      <span className="inline-flex gap-1">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+    <div role="status" className="flex items-center gap-2.5 text-sm text-muted">
+      <span className="inline-flex items-center gap-[3px] text-accent" aria-hidden="true">
+        <span className="h-1 w-1 animate-pulse rounded-full bg-current [animation-delay:-0.4s]" />
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current [animation-delay:-0.2s]" />
+        <span className="h-1 w-1 animate-pulse rounded-full bg-current" />
       </span>
-      {label}
+      {THINKING_WORDS[i]}
     </div>
   );
 }
 
 interface ItemProps extends Pick<Message, "role" | "content" | "model" | "attachments"> {
-  /** Set while this reply is being generated: what to say until the first text arrives. */
-  waiting?: string;
+  /** Set while this reply is being generated. */
+  generating?: boolean;
 }
 
-function MessageItem({ role, content, model, attachments, waiting }: ItemProps) {
+function MessageItem({ role, content, model, attachments, generating = false }: ItemProps) {
   const user = role === "user";
-  const generating = waiting !== undefined;
   const modelName = model ? parseModelRef(model).modelId : null;
 
   return (
@@ -67,7 +74,7 @@ function MessageItem({ role, content, model, attachments, waiting }: ItemProps) 
             <Markdown text={content} />
           </div>
         ) : (
-          waiting !== undefined && <TypingDots label={waiting} />
+          generating && <Thinking />
         )}
         {!user && (
           <div className="flex items-center gap-3">
@@ -119,7 +126,7 @@ export default function MessageList({
             content={pending.text ?? ""}
             model={pending.model}
             attachments={[]}
-            waiting={pending.text === null ? "Generating full response…" : "Waiting for first token…"}
+            generating
           />
         )}
       </div>
